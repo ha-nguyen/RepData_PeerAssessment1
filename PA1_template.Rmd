@@ -1,5 +1,6 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
+author: Ha Nguyen
 output: 
   html_document:
     keep_md: true
@@ -7,19 +8,107 @@ output:
 
 
 ## Loading and preprocessing the data
-
-
+```{r, echo=TRUE}
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip", "activity.zip", method = "curl")
+unzip("activity.zip",files = "activity.csv")
+activity <- read.csv("activity.csv", stringsAsFactors = F)
+```
 
 ## What is mean total number of steps taken per day?
+### Total number of steps taken each day 
+```{r, echo=TRUE}
+library(dplyr)
+activity_per_day <- activity %>% group_by(date) %>% summarise(totalSteps = sum(steps, na.rm = T))
+activity_per_day
+```
 
+### Histogram 
+```{r, echo=TRUE}
+hist(activity_per_day$totalStep)
+```
 
+### Mean and median of the total steps taken per day 
+``` {r, echo=TRUE}
+summary(activity_per_day$totalStep)
+``` 
 
 ## What is the average daily activity pattern?
+### Get the mean steps per time interval
+```{r, echo=TRUE}
+activity_per_interval <- activity %>% group_by(interval) %>% summarise(meanSteps = sum(steps, na.rm=T)/length(date))
+activity_per_interval
+```
 
+### Time series plot of the 5-minute interval 
+```{r, echo=TRUE}
+with(activity_per_interval, plot(interval, meanSteps, type = "l", main = "Average daily activity")) 
+```
 
+* interval from 8-9 am contains the maximum number of steps 
 
 ## Imputing missing values
+### Number of missing values in the data set 
+```{r, echo=TRUE}
+sum(is.na(activity$steps ))
+```
 
+### Filling all missing values with the mean for that 5-min interval 
+```{r, echo=TRUE}
+# Create copy of data set and filling missing values in the data set 
+activityComp <- activity
+# Record interval having missing values 
+intervalMissingV <- activityComp$interval[is.na(activityComp$steps)]
+# Replace them with mean of 5 min interval corresponded 
+activityComp$steps[is.na(activity$steps)]<- activity_per_interval$meanSteps[match(intervalMissingV, activity_per_interval$interval)]
+head(activityComp)
+```
 
+### Histogram of steps taken per day 
+```{r,  echo = T}
+activityComp_per_day <- activityComp %>% group_by(date) %>% summarise(totalSteps = sum(steps, na.rm = T))
+hist(activityComp_per_day$totalSteps)
+```
+
+### Mean and median of total number of steps taken per day with missing values replaced 
+```{r,  echo = T}
+summary(activityComp_per_day$totalStep)
+```
+
+### Compared with Old mean and median of total number of steps taken per day with missing values 
+```{r,  echo = T}
+summary(activity_per_day$totalStep)
+```
+
+- Affect of Imputing missing data on the estimates of the total daily number of steps: 
+
+        +  Changing Mean values
+        +  Keeping Median value the same.  
 
 ## Are there differences in activity patterns between weekdays and weekends?
+### Convert date column into date type 
+```{r, echo=TRUE}
+activityComp$date <- strptime(activityComp$date, format = "%F")
+```
+
+### Find weekday for each date column 
+``` {r, echo=TRUE}
+activityComp$weekday <- weekdays(activityComp$date)
+```
+
+### Create factor variable to identify weekday / weekend 
+```{r, echo=TRUE}
+weekday_list <- c("Monday", "Tuesday","Wednesday", "Thursday", "Friday")
+activityComp$isWeekday <- as.factor(ifelse(activityComp$weekday %in% weekday_list, "weekday", "weekend"))
+```
+
+### Time Series Plot of the 5-minute interval and the average number of steps taken, averaged across all weekday days or weekend days
+```{r, echo=TRUE}
+library(ggplot2)
+activityComp$date <- as.character(activityComp$date)
+activityComp_per_weekday <- activityComp %>% group_by(isWeekday, interval) %>% summarise(meanSteps = sum(steps, na.rm=T)/length(isWeekday))
+activityComp_per_weekday
+qplot(data = activityComp_per_weekday, x = interval, y = meanSteps, 
+      geom = "path", facets =isWeekday~.) 
+```
+
+- It seems there were more steps/activities in weekday than in weekend. 
